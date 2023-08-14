@@ -105,3 +105,64 @@ FROM winner
 JOIN join_table
 	ON winner.yearid = join_table.yearid AND winner.max_salary = join_table.salary
 ORDER BY yearid DESC;
+
+-- Task 6. Bean Machine: The pitcher most likely to hit a batter with a pitch
+-- This award goes to the pitcher who hit batters by pitch most
+
+SELECT pitching.playerid, CONCAT(people.namefirst,' ', people.namelast) AS name, people.debut, SUM(hbp) as bean_machine
+FROM pitching
+JOIN people
+	ON pitching.playerid = people.playerid
+WHERE hbp IS NOT NULL
+GROUP BY 1,2,3
+ORDER BY 4 DESC
+LIMIT 1;
+
+-- Task 7. Canadian Ace: The pitcher with the lowest ERA who played for a team whose stadium is in Canada
+-- This award goes to the pitcher who has the lowest ERA and plays in Canadian-based park.
+WITH era_table AS(
+  SELECT pitching.playerid, CONCAT(people.namefirst,' ', people.namelast) AS name, pitching.team_id, teams.park, MIN(pitching.era) as min_era
+	FROM pitching
+	JOIN people
+		ON pitching.playerid = people.playerid
+	JOIN teams
+		ON pitching.teamid = teams.teamid
+	WHERE pitching.era IS NOT NULL
+	GROUP BY 1, 2, 3, 4
+	ORDER BY min_era DESC
+),
+parks_in_canada AS(
+  SELECT DISTINCT parks.parkname, parks.country
+	FROM parks
+	JOIN teams
+		ON parks.parkname = teams.park
+	WHERE parks.country != 'US'
+)
+SELECT parkname, country, name, min_era
+FROM parks_in_canada
+JOIN era_table
+	ON parks_in_canada.parkname = era_table.park
+LIMIT 1;
+
+-- Task 8. Worst of the Best: The pitcher or batter inducted into the hall of fame with the worst career stats (you can decide what stat to look at)
+-- Stats Used: Homeruns, Runs Batted In and Strikeouts
+-- Players with more than 1000 games
+WITH summary_table AS (
+  SELECT batting.playerID, CONCAT(people.namefirst,' ', people.namelast) AS name, SUM(batting.hr) as sum_of_home_runs, SUM(batting.rbi) as sum_of_rbi, SUM(batting.so) as sum_of_so, SUM(batting.g) as sum_of_games
+	FROM batting
+  JOIN people
+    ON batting.playerid = people.playerid
+  
+  GROUP BY 1, 2
+  ORDER BY 3 DESC
+),
+poor_player AS(
+  SELECT *
+  FROM summary_table
+  WHERE sum_of_home_runs < 10 AND sum_of_rbi < 10 AND sum_of_so < 10
+)
+SELECT *
+FROM halloffame
+LEFT JOIN poor_player
+	ON halloffame.playerid = poor_player.playerid
+WHERE category = 'Player' AND sum_of_games > 1000
